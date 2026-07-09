@@ -6,59 +6,56 @@
 
 ## English
 
-Mini-Spring Visual Demo is a Java learning project that demonstrates how a simplified Spring-like IoC container loads XML bean definitions, creates beans, resolves dependencies, and exposes the result through a small browser UI.
+Mini-Spring Visual Demo is a self-contained Java project that implements a compact Spring-style IoC container and exposes its runtime behavior through a browser-based inspection console.
 
-The repository is self-contained:
+The project includes a simplified framework core, an XML-configured sample application, JUnit coverage, and a small local web console for exploring bean creation, dependency injection, and application context behavior.
 
-- `mini-spring-core/` contains the simplified Spring framework implementation.
-- `src/` contains a small demo application using the framework.
-- `MiniSpringWebServer` exposes a local visual console for interviews and demonstrations.
+### Highlights
 
-This is not a production web application. It is a learning project for understanding Spring fundamentals.
+- Spring-style IoC container implemented in Java
+- XML bean definition loading
+- `ClassPathXmlApplicationContext` support
+- Bean lookup through `getBean`
+- Controller-Service-Dao dependency wiring
+- Bean lifecycle and dependency-injection tests
+- Local browser console for runtime inspection
+- Self-contained Maven setup with PowerShell helpers
 
-### Features
-
-- Simplified IoC container
-- XML bean configuration
-- `ClassPathXmlApplicationContext`
-- `getBean` usage
-- Controller -> Service -> Dao dependency chain
-- JUnit tests
-- Local browser visual console
-- PowerShell run scripts
-
-### Project Structure
+### Repository Layout
 
 ```text
-mini-spring-core/        Simplified Spring framework implementation
-src/main/java/           Demo application and visual web console
-src/main/resources/      spring.xml bean configuration
-src/test/java/           JUnit tests
-pom.xml                  Demo Maven project
-run_tests.ps1            Installs core and runs tests
-run_visual_console.ps1   Installs core and starts the browser console
+mini-spring-core/        Framework core implementation
+src/main/java/           Sample application and browser console
+src/main/resources/      XML bean configuration
+src/test/java/           JUnit tests for the sample application
+pom.xml                  Maven project for the visual demo
+run_tests.ps1            Installs the core module and runs tests
+run_visual_console.ps1   Installs the core module and starts the console
 ```
 
-### Quick Start
+### Getting Started
 
 ```powershell
-cd "F:\All projects\workspace\workspace\mini-spring-test"
+git clone https://github.com/LoveAmiya/mini-spring-visual-demo.git
+cd mini-spring-visual-demo
 .\run_tests.ps1
 ```
 
-### Run the Visual Console
+The test script first installs `mini-spring-core` into the local Maven repository, then runs the visual demo test suite.
+
+### Start the Visual Console
 
 ```powershell
 .\run_visual_console.ps1
 ```
 
-Open:
+Open the console at:
 
 ```text
 http://127.0.0.1:18080
 ```
 
-Available endpoints:
+Available API endpoints:
 
 ```text
 GET /api/health
@@ -66,9 +63,7 @@ GET /api/user
 GET /api/beans
 ```
 
-### Run the CLI Demo
-
-The scripts install `mini-spring-core` into the local Maven repository first. To run manually:
+### Run the CLI Example
 
 ```powershell
 cd mini-spring-core
@@ -77,67 +72,62 @@ cd ..
 mvn exec:java '-Dexec.mainClass=com.test.minispring.App'
 ```
 
-### What to Explain in an Interview
+### How It Works
 
-1. `mini-spring-core/`: simplified Spring framework implementation.
-2. `src/main/resources/spring.xml`: XML bean configuration.
-3. `App.java`: loads `ClassPathXmlApplicationContext` and calls `getBean`.
-4. `TestUserController`, `TestUserService`, `TestUserDao`: dependency chain.
-5. `MiniSpringDemoService`: reuses the mini-spring container for the web demo.
-6. `MiniSpringWebServer`: exposes the local HTML UI and JSON endpoints.
+1. `spring.xml` defines the application beans and dependencies.
+2. `ClassPathXmlApplicationContext` loads and parses the XML configuration.
+3. The container creates the configured beans and resolves dependencies.
+4. The sample application retrieves beans with `getBean`.
+5. The browser console reads the same application context and exposes the resolved beans through HTML and JSON endpoints.
 
-### Current Scope
+### Requirements
 
-- This is not Spring Boot.
-- This is not a production web service.
-- The browser UI is only a visual layer for demonstrating the framework behavior.
-- Docker and hosted deployment are intentionally out of scope for this small learning demo.
+- JDK
+- Maven
+- PowerShell on Windows for the helper scripts
 
 ---
 
 ## 中文
 
-Mini-Spring Visual Demo 是一个 Java/Spring 原理学习项目，用来展示一个简化版 Spring IoC 容器如何读取 XML Bean 配置、创建 Bean、处理依赖关系，并通过一个本地浏览器页面可视化展示结果。
+Mini-Spring Visual Demo 是一个自包含的 Java 项目，实现了一个精简版 Spring 风格 IoC 容器，并通过浏览器控制台展示容器运行时行为。
 
-这个仓库是自包含的：
+项目包含简化框架核心、基于 XML 配置的示例应用、JUnit 测试，以及一个本地 Web 控制台，用于观察 Bean 创建、依赖注入和应用上下文加载过程。
 
-- `mini-spring-core/`：简化版 Spring 框架核心实现。
-- `src/`：使用该框架的 demo 应用。
-- `MiniSpringWebServer`：本地可视化控制台，方便面试和演示。
+### 项目亮点
 
-这不是生产级 Web 应用，而是用于理解 Spring 核心原理的学习项目。
-
-### 功能特点
-
-- 简化版 IoC 容器
-- XML Bean 配置
-- `ClassPathXmlApplicationContext`
-- `getBean` 调用
-- Controller -> Service -> Dao 依赖链
-- JUnit 测试
-- 本地浏览器可视化控制台
-- PowerShell 运行脚本
+- Java 实现的 Spring 风格 IoC 容器
+- XML Bean 定义加载
+- 支持 `ClassPathXmlApplicationContext`
+- 支持通过 `getBean` 获取 Bean
+- Controller-Service-Dao 依赖注入链路
+- Bean 生命周期和依赖注入测试
+- 本地浏览器控制台，可观察运行结果
+- 自包含 Maven 项目，并提供 PowerShell 辅助脚本
 
 ### 项目结构
 
 ```text
-mini-spring-core/        简化版 Spring 框架核心实现
-src/main/java/           demo 应用和可视化 Web 控制台
-src/main/resources/      spring.xml Bean 配置
-src/test/java/           JUnit 测试
-pom.xml                  demo Maven 项目
-run_tests.ps1            安装核心框架并运行测试
-run_visual_console.ps1   安装核心框架并启动浏览器控制台
+mini-spring-core/        框架核心实现
+src/main/java/           示例应用和浏览器控制台
+src/main/resources/      XML Bean 配置
+src/test/java/           示例应用的 JUnit 测试
+pom.xml                  可视化示例的 Maven 项目
+run_tests.ps1            安装核心模块并运行测试
+run_visual_console.ps1   安装核心模块并启动可视化控制台
 ```
 
 ### 快速开始
 
 ```powershell
-cd "F:\All projects\workspace\workspace\mini-spring-test"
+git clone https://github.com/LoveAmiya/mini-spring-visual-demo.git
+cd mini-spring-visual-demo
 .\run_tests.ps1
 ```
 
-### 运行可视化控制台
+测试脚本会先把 `mini-spring-core` 安装到本地 Maven 仓库，再运行外层可视化示例的测试。
+
+### 启动可视化控制台
 
 ```powershell
 .\run_visual_console.ps1
@@ -157,9 +147,7 @@ GET /api/user
 GET /api/beans
 ```
 
-### 运行命令行 Demo
-
-脚本会先把 `mini-spring-core` 安装到本地 Maven 仓库。如果想手动运行：
+### 运行命令行示例
 
 ```powershell
 cd mini-spring-core
@@ -168,18 +156,16 @@ cd ..
 mvn exec:java '-Dexec.mainClass=com.test.minispring.App'
 ```
 
-### 面试讲解顺序
+### 工作流程
 
-1. `mini-spring-core/`：简化版 Spring 框架核心实现。
-2. `src/main/resources/spring.xml`：XML Bean 配置。
-3. `App.java`：加载 `ClassPathXmlApplicationContext` 并调用 `getBean`。
-4. `TestUserController`、`TestUserService`、`TestUserDao`：依赖调用链。
-5. `MiniSpringDemoService`：Web demo 如何复用 mini-spring 容器。
-6. `MiniSpringWebServer`：如何暴露本地 HTML 页面和 JSON 接口。
+1. `spring.xml` 定义应用 Bean 和依赖关系。
+2. `ClassPathXmlApplicationContext` 加载并解析 XML 配置。
+3. 容器创建 Bean，并完成依赖关系注入。
+4. 示例应用通过 `getBean` 获取容器中的对象。
+5. 浏览器控制台复用同一个应用上下文，并通过 HTML 和 JSON 接口展示解析结果。
 
-### 当前边界
+### 环境要求
 
-- 这不是 Spring Boot 项目。
-- 这不是生产级 Web 服务。
-- 浏览器界面只是为了可视化展示框架行为。
-- Docker 和线上部署暂时不属于这个小型学习 demo 的重点。
+- JDK
+- Maven
+- Windows PowerShell，用于运行辅助脚本
