@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans>
+    <bean id="userDao" class="com.test.minispring.bean.TestUserDao"/>
+
+    <bean id="userService" class="com.test.minispring.bean.TestUserService">
+        <property name="company" value="Legend Co., Ltd."/>
+        <property name="userDao" ref="userDao"/>
+    </bean>
+
+    <bean id="userController" class="com.test.minispring.bean.TestUserController">
+        <property name="userService" ref="userService"/>
+    </bean>
+</beans>

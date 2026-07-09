@@ -1,0 +1,9 @@
+target/
+**/target/
+.idea/
+**/.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+.mvn/wrapper/maven-wrapper.jar
