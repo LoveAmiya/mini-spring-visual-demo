@@ -33,4 +33,16 @@ public class AppTest {
         assertTrue(service.readXmlConfig().contains("userController"));
         assertFalse(service.traceSteps().isEmpty());
     }
+
+    @Test
+    public void exposesStepByStepIocFlowForVisualConsole() {
+        MiniSpringDemoService service = new MiniSpringDemoService();
+
+        assertEquals(10, service.visualFlow().size());
+        assertEquals("load-xml", service.visualFlow().get(0).id());
+        assertTrue(service.visualFlow().stream()
+                .anyMatch(step -> step.title().contains("注入 userDao")
+                        && step.activeEdges().contains("dao-service")));
+        assertTrue(service.visualFlow().get(9).activeNodes().contains("client"));
+    }
 }
