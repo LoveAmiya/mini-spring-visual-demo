@@ -10,11 +10,18 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 浏览器演示层与 Mini-Spring 核心之间的只读适配器。
+ *
+ * 每次 API 调用都会创建新的 Context，以便页面反复展示完整启动过程。这适合教学，
+ * 但不同于生产服务：生产环境通常让一个 ApplicationContext 存活到进程结束。
+ */
 public class MiniSpringDemoService {
 
     private static final String CONFIG_LOCATION = "classpath:spring.xml";
 
     public ApplicationContext createContext() {
+        // 构造器会调用 refresh()，依次完成 XML 解析、定义注册、单例 Bean 创建和依赖注入。
         return new ClassPathXmlApplicationContext(CONFIG_LOCATION);
     }
 
@@ -26,6 +33,7 @@ public class MiniSpringDemoService {
     }
 
     public List<BeanView> listBeans() {
+        // 先列出定义，再解析每个 Bean，使可视化页面同时展示 XML 声明名和运行时实例类型。
         ApplicationContext context = createContext();
         String[] beanNames = context.getBeanDefinitionNames();
         List<BeanView> beans = new ArrayList<>();
@@ -37,6 +45,7 @@ public class MiniSpringDemoService {
     }
 
     public String readXmlConfig() {
+        // 从 classpath 而不是本机绝对路径读取，保证 Maven、测试和可视化服务使用同一资源。
         try (InputStream inputStream =
                      Thread.currentThread().getContextClassLoader().getResourceAsStream("spring.xml")) {
             if (inputStream == null) {
@@ -49,6 +58,7 @@ public class MiniSpringDemoService {
     }
 
     public List<String> traceSteps() {
+        // 这些是讲解里程碑，不是运行日志；真实运行状态仍通过 /api/beans 和 /api/user 展示。
         return List.of(
                 "1. ClassPathXmlApplicationContext loads classpath:spring.xml.",
                 "2. XmlBeanDefinitionReader parses bean definitions from XML.",
@@ -62,6 +72,7 @@ public class MiniSpringDemoService {
     }
 
     public List<FlowStep> visualFlow() {
+        // 前端借助这些关系高亮 Mini-Spring 核心内部执行的同一条依赖链路。
         return List.of(
                 new FlowStep(
                         "load-xml",

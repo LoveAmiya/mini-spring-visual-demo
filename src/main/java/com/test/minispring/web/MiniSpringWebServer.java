@@ -11,14 +11,22 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+/**
+ * 用于可视化 IoC 演示的无额外依赖本地 HTTP 服务。
+ *
+ * 本类刻意保持为薄传输层：端点 handler 调用 MiniSpringDemoService 并序列化其结果，
+ * 核心容器无需感知 HTTP 和浏览器相关逻辑。
+ */
 public class MiniSpringWebServer {
 
     private static final int DEFAULT_PORT = 18080;
     private static final MiniSpringDemoService DEMO_SERVICE = new MiniSpringDemoService();
 
     public static void main(String[] args) throws IOException {
+        // 端口可来自参数或环境变量，方便面试现场切换；默认值保证 README 命令可直接复制运行。
         int port = resolvePort(args);
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+        // 静态页面加小型 JSON 接口，让浏览器可分别查看每个 IoC 阶段，而不只看到测试结果。
         server.createContext("/", MiniSpringWebServer::handleIndex);
         server.createContext("/api/health", MiniSpringWebServer::handleHealth);
         server.createContext("/api/beans", MiniSpringWebServer::handleBeans);
@@ -55,6 +63,7 @@ public class MiniSpringWebServer {
     }
 
     private static void handleBeans(HttpExchange exchange) throws IOException {
+        // 此接口展示 BeanDefinition 名称和实例类型，体现“配置元数据”和“运行对象”的关键区别。
         try {
             List<BeanView> beans = DEMO_SERVICE.listBeans();
             StringBuilder json = new StringBuilder();
@@ -77,6 +86,7 @@ public class MiniSpringWebServer {
     }
 
     private static void handleUser(HttpExchange exchange) throws IOException {
+        // 成功响应证明真实容器中已注入的 Controller -> Service -> Dao 链路能够端到端运行。
         try {
             String userInfo = DEMO_SERVICE.queryUserInfo();
             sendJson(exchange, 200, "{\"result\":\"" + escapeJson(userInfo) + "\"}");
@@ -100,6 +110,7 @@ public class MiniSpringWebServer {
     }
 
     private static void handleFlow(HttpExchange exchange) throws IOException {
+        // FlowStep 使用结构化 JSON，使 UI 能把可视化节点映射到对应源码与依赖关系。
         List<FlowStep> steps = DEMO_SERVICE.visualFlow();
         StringBuilder json = new StringBuilder();
         json.append("{\"steps\":[");
@@ -154,6 +165,7 @@ public class MiniSpringWebServer {
     }
 
     private static String escapeJson(String value) {
+        // 本服务刻意不引入 JSON 库，因此所有动态字符串写入响应体前必须转义。
         StringBuilder escaped = new StringBuilder();
         for (int i = 0; i < value.length(); i++) {
             char ch = value.charAt(i);

@@ -76,6 +76,8 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 
     @Override
     public void loadBeanDefinitions(Resource resource) throws BeansException {
+        // Resource 抽象 classpath/文件系统访问。该 reader 只把 XML 转为 BeanDefinition
+        // 元数据；真正的对象创建延后到 BeanFactory#getBean。
         try (InputStream inputStream = resource.getInputStream()) {
             doLoadBeanDefinitions(inputStream, resource);
         } catch (IOException | DocumentException e) {
@@ -99,4 +101,4 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
         // 记录日志
         System.out.println("从资源 [" + resource + "] 加载了Bean定义");
     }
-} 
+}

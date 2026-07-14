@@ -30,6 +30,8 @@ public class ClassPathXmlApplicationContext extends AbstractXmlApplicationContex
      * @throws BeansException 如果创建上下文失败
      */
     public ClassPathXmlApplicationContext(String[] configLocations) throws BeansException {
+        // refresh() 是从抽象 Context 继承的模板方法启动流程：XML 解析交给 reader，
+        // 单例创建和属性注入交给 BeanFactory。
         this.configLocations = configLocations;
         refresh();
     }

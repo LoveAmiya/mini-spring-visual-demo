@@ -88,6 +88,13 @@ public abstract class AbstractBeanFactory extends DefaultSingletonBeanRegistry i
      * @throws BeansException 如果获取Bean失败
      */
     protected <T> T doGetBean(String name, Class<T> requiredType, Object[] args) throws BeansException {
+        /*
+         * Bean 查找主流程：
+         * 1. 缓存中已有单例时直接返回。
+         * 2. 否则读取 BeanDefinition，它是元数据而不是运行对象。
+         * 3. 委托 createBean 完成对象创建与属性注入。
+         * 4. 单例结果写入缓存；原型 Bean 则每次创建新对象。
+         */
         // 先从单例Bean缓存中获取
         Object bean = getSingleton(name);
         if (bean != null) {
@@ -144,4 +151,4 @@ public abstract class AbstractBeanFactory extends DefaultSingletonBeanRegistry i
      * @throws BeansException 如果创建Bean失败
      */
     protected abstract Object createBean(String beanName, BeanDefinition beanDefinition, Object[] args) throws BeansException;
-} 
+}
