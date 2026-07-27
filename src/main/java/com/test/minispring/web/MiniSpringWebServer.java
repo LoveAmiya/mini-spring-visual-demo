@@ -1,12 +1,14 @@
 package com.test.minispring.web;
 
 import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.test.minispring.web.MiniSpringDemoService.BeanView;
 import com.test.minispring.web.MiniSpringDemoService.FlowStep;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -24,42 +26,73 @@ public class MiniSpringWebServer {
 
     public static void main(String[] args) throws IOException {
         // 端口可来自参数或环境变量，方便面试现场切换；默认值保证 README 命令可直接复制运行。
-        int port = resolvePort(args);
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-        // 静态页面加小型 JSON 接口，让浏览器可分别查看每个 IoC 阶段，而不只看到测试结果。
-        server.createContext("/", MiniSpringWebServer::handleIndex);
-        server.createContext("/api/health", MiniSpringWebServer::handleHealth);
-        server.createContext("/api/beans", MiniSpringWebServer::handleBeans);
-        server.createContext("/api/user", MiniSpringWebServer::handleUser);
-        server.createContext("/api/xml", MiniSpringWebServer::handleXml);
-        server.createContext("/api/trace", MiniSpringWebServer::handleTrace);
-        server.createContext("/api/flow", MiniSpringWebServer::handleFlow);
-        server.setExecutor(null);
+        int port = resolvePort(args, System.getenv("MINI_SPRING_WEB_PORT"));
+        HttpServer server = createServer(port);
         server.start();
         System.out.println("Mini-Spring IoC Visualizer started at http://127.0.0.1:" + port);
     }
 
-    private static int resolvePort(String[] args) {
+    static HttpServer createServer(int port) throws IOException {
+        HttpServer server = HttpServer.create(
+                new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
+        // 静态页面加小型 JSON 接口，让浏览器可分别查看每个 IoC 阶段，而不只看到测试结果。
+        createGetContext(server, "/", MiniSpringWebServer::handleIndex);
+        createGetContext(server, "/api/health", MiniSpringWebServer::handleHealth);
+        createGetContext(server, "/api/security", MiniSpringWebServer::handleSecurity);
+        createGetContext(server, "/api/beans", MiniSpringWebServer::handleBeans);
+        createGetContext(server, "/api/user", MiniSpringWebServer::handleUser);
+        createGetContext(server, "/api/xml", MiniSpringWebServer::handleXml);
+        createGetContext(server, "/api/trace", MiniSpringWebServer::handleTrace);
+        createGetContext(server, "/api/flow", MiniSpringWebServer::handleFlow);
+        server.setExecutor(null);
+        return server;
+    }
+
+    static int resolvePort(String[] args, String envPort) {
+        String rawPort = null;
         if (args.length > 0) {
-            return Integer.parseInt(args[0]);
+            rawPort = args[0];
+        } else if (envPort != null && !envPort.isBlank()) {
+            rawPort = envPort;
         }
-        String envPort = System.getenv("MINI_SPRING_WEB_PORT");
-        if (envPort != null && !envPort.isBlank()) {
-            return Integer.parseInt(envPort);
+        if (rawPort == null) {
+            return DEFAULT_PORT;
         }
-        return DEFAULT_PORT;
+        try {
+            int port = Integer.parseInt(rawPort);
+            if (port < 1 || port > 65535) {
+                throw new IllegalArgumentException("Port must be between 1 and 65535");
+            }
+            return port;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Port must be an integer", exception);
+        }
+    }
+
+    private static void createGetContext(HttpServer server, String path, HttpHandler handler) {
+        server.createContext(path, exchange -> {
+            if (!"GET".equals(exchange.getRequestMethod())) {
+                exchange.getResponseHeaders().set("Allow", "GET");
+                sendJson(exchange, 405, errorJson("METHOD_NOT_ALLOWED", "Only GET is supported."));
+                return;
+            }
+            handler.handle(exchange);
+        });
     }
 
     private static void handleIndex(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
-            sendJson(exchange, 405, errorJson("METHOD_NOT_ALLOWED", "Only GET is supported."));
-            return;
-        }
         send(exchange, 200, "text/html; charset=utf-8", indexHtml());
     }
 
     private static void handleHealth(HttpExchange exchange) throws IOException {
         sendJson(exchange, 200, "{\"ok\":true,\"service\":\"mini-spring-ioc-visualizer\"}");
+    }
+
+    private static void handleSecurity(HttpExchange exchange) throws IOException {
+        sendJson(exchange, 200, "{\"localOnly\":true,\"binding\":\"127.0.0.1\","
+                + "\"allowedMethods\":[\"GET\"],\"xml\":{\"doctypeAllowed\":false,"
+                + "\"externalEntitiesAllowed\":false,\"externalDtdAllowed\":false,"
+                + "\"configSource\":\"trusted-classpath\"}}");
     }
 
     private static void handleBeans(HttpExchange exchange) throws IOException {
@@ -75,8 +108,10 @@ public class MiniSpringWebServer {
                 }
                 json.append("{\"name\":\"").append(escapeJson(bean.name()))
                         .append("\",\"className\":\"").append(escapeJson(bean.className()))
+                        .append("\",\"displayClassName\":\"").append(escapeJson(bean.displayClassName()))
                         .append("\",\"role\":\"").append(escapeJson(bean.role()))
-                        .append("\"}");
+                        .append("\",\"proxied\":").append(bean.proxied())
+                        .append("}");
             }
             json.append("]}");
             sendJson(exchange, 200, json.toString());
@@ -345,7 +380,7 @@ public class MiniSpringWebServer {
                     @keyframes dash { to { stroke-dashoffset: -24; } }
                     .node {
                       position: absolute;
-                      width: 168px;
+                      width: 150px;
                       min-height: 88px;
                       transform: translate(-50%, -50%);
                       padding: 12px;
@@ -440,13 +475,69 @@ public class MiniSpringWebServer {
                     }
                     .bean-row strong { display: block; font-size: 14px; }
                     .bean-row span { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+                    .bean-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+                    .bean-badge { padding: 3px 6px; border-radius: 4px; background: #e0f2fe; color: #075985; font-size: 11px; font-weight: 700; }
+                    details { margin-top: 10px; }
+                    summary { color: var(--blue); cursor: pointer; font-size: 12px; font-weight: 700; }
+                    details code { display: block; margin-top: 7px; color: #475569; font-size: 11px; overflow-wrap: anywhere; }
+                    .plain-result { min-height: 92px; padding: 12px; border: 1px solid #dbe3ef; border-radius: 8px; background: #f8fafc; line-height: 1.65; }
+                    .plain-result strong { display: block; margin-bottom: 5px; }
+                    .plain-result.pending { color: var(--muted); }
+                    .outcome-band {
+                      width: min(1440px, calc(100% - 48px));
+                      margin: 12px auto 0;
+                      padding: 14px 16px;
+                      background: #fff;
+                      border: 1px solid var(--line);
+                      border-left: 4px solid var(--blue);
+                      border-radius: 8px;
+                    }
+                    .outcome-band h2 { margin: 0 0 6px; font-size: 16px; }
+                    .outcome-band p { margin: 0; color: #334155; line-height: 1.55; }
+                    .outcome-chain { color: var(--blue); font-weight: 700; }
+                    .glossary-band {
+                      width: min(1440px, calc(100% - 48px));
+                      margin: 12px auto 0;
+                      padding: 14px 16px;
+                      background: #fff;
+                      border: 1px solid var(--line);
+                      border-left: 4px solid var(--orange);
+                      border-radius: 8px;
+                    }
+                    .glossary-band h2 { margin: 0 0 10px; font-size: 16px; }
+                    .glossary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 18px; }
+                    .term-item { margin: 0; padding-left: 10px; border-left: 2px solid #fed7aa; color: #334155; font-size: 13px; line-height: 1.55; }
+                    .term-item strong { color: var(--ink); }
+                    .xml-guide { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+                    .xml-guide h4 { margin: 0 0 7px; font-size: 14px; }
+                    .xml-guide ol { margin: 0; padding-left: 22px; color: #334155; font-size: 13px; line-height: 1.55; }
+                    .xml-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin-top: 9px; font-size: 12px; color: var(--muted); }
+                    .xml-legend b { color: var(--ink); }
+                    .section-help { margin: -5px 0 10px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+                    .bean-class { margin: 4px 0 5px; color: #334155 !important; }
                     .status {
                       min-height: 22px;
                       margin: 0 0 12px;
                       color: var(--muted);
                       line-height: 1.5;
                     }
-                    @media (max-width: 1180px) {
+                    .guardrail-band {
+                      width: min(1440px, calc(100% - 48px));
+                      margin: 16px auto 0;
+                      padding: 13px 14px;
+                      background: #eef8f3;
+                      border: 1px solid #b8dcc8;
+                      border-radius: 8px;
+                    }
+                    .guardrail-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 9px; }
+                    .guardrail-head h2 { margin: 0; font-size: 15px; }
+                    .guardrail-head span { color: var(--green); font-size: 12px; font-weight: 700; }
+                    .guardrail-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+                    .guardrail-item { min-width: 0; padding: 8px 9px; background: #fff; border: 1px solid #d2e8dc; border-radius: 6px; }
+                    .guardrail-item span, .guardrail-item strong { display: block; overflow-wrap: anywhere; }
+                    .guardrail-item span { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+                    .guardrail-item strong { font-size: 13px; }
+                    @media (max-width: 1340px) {
                       .workspace { grid-template-columns: 260px 1fr; }
                       .inspector { grid-column: 1 / -1; }
                     }
@@ -454,9 +545,27 @@ public class MiniSpringWebServer {
                       .topbar { align-items: flex-start; flex-direction: column; }
                       .toolbar { justify-content: flex-start; }
                       .workspace { grid-template-columns: 1fr; }
-                      .stage { min-height: 620px; }
-                      .flow-map { min-height: 520px; }
+                      .stage { min-height: 0; }
+                      .flow-map {
+                        display: grid;
+                        grid-template-columns: 1fr;
+                        gap: 8px;
+                        min-height: 0;
+                        padding: 12px;
+                        overflow: visible;
+                      }
+                      .flow-svg { display: none; }
+                      .node, .node.active {
+                        position: relative;
+                        left: auto !important;
+                        top: auto !important;
+                        width: 100%;
+                        min-height: 0;
+                        transform: none;
+                      }
                       .runtime { grid-template-columns: 1fr; }
+                      .guardrail-grid { grid-template-columns: 1fr; }
+                      .glossary-grid, .xml-legend { grid-template-columns: 1fr; }
                     }
                   </style>
                 </head>
@@ -464,7 +573,7 @@ public class MiniSpringWebServer {
                   <header class="topbar">
                     <div class="title">
                       <h1>Mini-Spring IoC Visualizer</h1>
-                      <p>逐步观察 XML 配置如何变成 BeanDefinition、Bean 实例、依赖注入链和 getBean 返回结果。</p>
+                      <p>逐步观察一份配置如何变成三个能协作的 Java 对象，以及容器怎样自动把它们连接起来。</p>
                     </div>
                     <div class="toolbar">
                       <button id="prevBtn" class="secondary">上一步</button>
@@ -473,6 +582,33 @@ public class MiniSpringWebServer {
                       <button id="resetBtn" class="secondary">重置</button>
                     </div>
                   </header>
+
+                  <section class="guardrail-band" aria-labelledby="guardrailTitle">
+                    <div class="guardrail-head">
+                      <h2 id="guardrailTitle">运行护栏</h2>
+                      <span>XML 与 Web 边界已启用</span>
+                    </div>
+                    <div id="guardrailGrid" class="guardrail-grid"></div>
+                  </section>
+
+                  <section class="outcome-band" id="learningOutcome" aria-labelledby="learningOutcomeTitle">
+                    <h2 id="learningOutcomeTitle">这套容器最终做成了什么</h2>
+                    <p>它会读取一份 XML 配置，自动创建三个对象并连接成
+                      <span class="outcome-chain">调用入口 userController -> 业务服务 userService -> 数据访问 userDao</span>。
+                      走到第 10 步后，页面会用真实查询结果证明这条依赖链可以工作。</p>
+                  </section>
+
+                  <section class="glossary-band" id="glossary" aria-labelledby="glossaryTitle">
+                    <h2 id="glossaryTitle">先认识 6 个名词</h2>
+                    <div class="glossary-grid">
+                      <p class="term-item">Bean：由容器创建和管理的 Java 对象。</p>
+                      <p class="term-item">IoC 容器：负责创建、保存和连接这些对象的程序。</p>
+                      <p class="term-item">依赖注入：容器自动把一个对象需要的另一个对象连接进去。</p>
+                      <p class="term-item">AOP 代理：在不改业务代码的前提下附加通用功能。</p>
+                      <p class="term-item">BeanDefinition：配置被读懂后形成的“对象说明书”，还不是真正对象。</p>
+                      <p class="term-item">单例：同一个名字多次获取时，容器复用同一个对象。</p>
+                    </div>
+                  </section>
 
                   <main class="workspace">
                     <aside class="panel sidebar">
@@ -511,46 +647,64 @@ public class MiniSpringWebServer {
                           <path data-edge="client-controller" d="M 88 84 C 93 73, 91 70, 87 70" marker-end="url(#arrow)"></path>
                         </svg>
 
-                        <div class="node" data-node="xml" style="left:10%;top:14%;">
-                          <small>配置文件</small><strong>spring.xml</strong><code>&lt;bean id="..." /&gt;</code>
+                        <div class="node" data-node="xml" style="left:14%;top:14%;">
+                          <small>第 1 步</small><strong>找到配置文件</strong><code>技术名：spring.xml</code>
                         </div>
-                        <div class="node" data-node="reader" style="left:34%;top:14%;">
-                          <small>读取器</small><strong>XmlBeanDefinitionReader</strong><code>loadBeanDefinitions()</code>
+                        <div class="node" data-node="reader" style="left:38%;top:14%;">
+                          <small>第 2 步</small><strong>读懂配置</strong><code>技术名：XmlBeanDefinitionReader</code>
                         </div>
-                        <div class="node" data-node="definition" style="left:57%;top:14%;">
-                          <small>对象蓝图</small><strong>BeanDefinition</strong><code>class + properties</code>
+                        <div class="node" data-node="definition" style="left:62%;top:14%;">
+                          <small>第 2 步的产物</small><strong>生成对象说明书</strong><code>技术名：BeanDefinition</code>
                         </div>
-                        <div class="node" data-node="registry" style="left:82%;top:14%;">
-                          <small>定义注册表</small><strong>BeanDefinitionRegistry</strong><code>userDao/userService/userController</code>
+                        <div class="node" data-node="registry" style="left:86%;top:14%;">
+                          <small>第 3 步</small><strong>记住三份说明书</strong><code>技术名：BeanDefinitionRegistry</code>
                         </div>
                         <div class="node" data-node="factory" style="left:50%;top:46%;">
-                          <small>创建中心</small><strong>BeanFactory</strong><code>createBean()</code>
+                          <small>第 4-9 步</small><strong>按说明书创建对象</strong><code>技术名：BeanFactory</code>
                         </div>
                         <div class="node bean" data-node="dao" style="left:20%;top:73%;">
-                          <small>数据层 Bean</small><strong>userDao</strong><code>TestUserDao</code>
+                          <small>数据访问对象</small><strong>提供用户数据</strong><code>对象名：userDao</code>
                         </div>
                         <div class="node bean" data-node="service" style="left:50%;top:73%;">
-                          <small>业务层 Bean</small><strong>userService</strong><code>userDao + company</code>
+                          <small>业务服务对象</small><strong>处理业务</strong><code>对象名：userService</code>
                         </div>
                         <div class="node bean" data-node="controller" style="left:80%;top:73%;">
-                          <small>入口 Bean</small><strong>userController</strong><code>userService</code>
+                          <small>调用入口对象</small><strong>接收外部查询</strong><code>对象名：userController</code>
                         </div>
                         <div class="node cache" data-node="singletons" style="left:50%;top:90%;">
-                          <small>单例缓存</small><strong>singletonObjects</strong><code>ready beans</code>
+                          <small>第 9 步</small><strong>保存可复用对象</strong><code>技术名：singletonObjects</code>
                         </div>
                         <div class="node" data-node="client" style="left:86%;top:90%;">
-                          <small>应用调用</small><strong>getBean()</strong><code>"userController"</code>
+                          <small>第 10 步</small><strong>取出入口开始查询</strong><code>技术名：getBean()</code>
                         </div>
                       </div>
 
                       <div class="runtime">
                         <div class="runtime-section">
-                          <h3>运行结果</h3>
-                          <pre id="userResult">等待执行 getBean("userController")...</pre>
+                          <h3>当前运行结果</h3>
+                          <div id="userResult" class="plain-result pending">尚未执行 getBean("userController")。走到第 10 步后显示最终结果。</div>
                         </div>
                         <div class="runtime-section">
-                          <h3>spring.xml</h3>
-                          <pre id="xmlSource">正在加载 XML...</pre>
+                          <h3>当前配置变化</h3>
+                          <div id="xmlExplanation" class="plain-result">正在加载 XML...</div>
+                          <div class="xml-guide">
+                            <h4>每段配置是什么意思</h4>
+                            <ol>
+                              <li><strong>userDao：</strong>创建负责提供用户数据的对象。</li>
+                              <li><strong>userService：</strong>创建业务对象，填入公司名称，并连接 userDao。</li>
+                              <li><strong>userController：</strong>创建调用入口，并连接 userService。</li>
+                            </ol>
+                            <div class="xml-legend">
+                              <span>id 是对象在容器里的名字</span>
+                              <span>class 是要创建的 Java 类</span>
+                              <span>value 是直接填入的文字或数字</span>
+                              <span>ref 表示引用另一个 Bean</span>
+                            </div>
+                          </div>
+                          <details>
+                            <summary>技术详情：查看完整 spring.xml</summary>
+                            <pre id="xmlSource">正在加载 XML...</pre>
+                          </details>
                         </div>
                       </div>
                     </section>
@@ -560,14 +714,19 @@ public class MiniSpringWebServer {
                       <p class="status" id="stepCounter">Step 0 / 0</p>
                       <h3 class="detail-title" id="detailTitle">等待加载</h3>
                       <p class="detail-text" id="detailText">流程数据加载后，这里会显示当前步骤的输入、输出和容器行为。</p>
-                      <code class="code-ref" id="codeRef">code reference</code>
+                      <details>
+                        <summary>技术详情：查看对应源码</summary>
+                        <code class="code-ref" id="codeRef">code reference</code>
+                      </details>
                       <div class="detail-block">
                         <h2>Bean 列表</h2>
+                        <p class="section-help">下面每一项都是一个 Bean。这是容器自动创建并管理的 Java 对象；对象名用于查找，Java 类保存业务代码。“已由 AOP 增强”表示容器用代理包裹原对象，在不修改业务代码的情况下附加通用功能。</p>
                         <div class="bean-list" id="beanList"></div>
                       </div>
                       <div class="detail-block">
-                        <h2>执行轨迹</h2>
-                        <pre id="traceText">正在加载 trace...</pre>
+                        <h2>已经完成的步骤</h2>
+                        <p class="section-help">这里只显示走到当前为止发生的事；技术类名放在“技术详情”中，需要时再查看。</p>
+                        <pre id="traceText">正在加载流程...</pre>
                       </div>
                     </aside>
                   </main>
@@ -575,6 +734,8 @@ public class MiniSpringWebServer {
                   <script>
                     const state = {
                       steps: [],
+                      beans: [],
+                      userResult: '',
                       current: 0,
                       timer: null
                     };
@@ -589,9 +750,11 @@ public class MiniSpringWebServer {
                       codeRef: document.getElementById('codeRef'),
                       stepCounter: document.getElementById('stepCounter'),
                       userResult: document.getElementById('userResult'),
+                      xmlExplanation: document.getElementById('xmlExplanation'),
                       xmlSource: document.getElementById('xmlSource'),
                       beanList: document.getElementById('beanList'),
                       traceText: document.getElementById('traceText'),
+                      guardrailGrid: document.getElementById('guardrailGrid'),
                       prevBtn: document.getElementById('prevBtn'),
                       nextBtn: document.getElementById('nextBtn'),
                       playBtn: document.getElementById('playBtn'),
@@ -620,7 +783,7 @@ public class MiniSpringWebServer {
                       els.stepList.innerHTML = state.steps.map((step, index) => `
                         <button class="step-item" data-step-index="${index}">
                           <strong>${index + 1}. ${escapeHtml(step.title)}</strong>
-                          <span>${escapeHtml(step.id)}</span>
+                          <span>点击查看这一阶段发生了什么</span>
                         </button>
                       `).join('');
                       els.stepList.querySelectorAll('[data-step-index]').forEach(button => {
@@ -628,14 +791,95 @@ public class MiniSpringWebServer {
                       });
                     }
 
-                    function renderBeans(beans) {
-                      els.beanList.innerHTML = beans.map(bean => `
+                    function renderGuardrails(security) {
+                      const xml = security.xml || {};
+                      const items = [
+                        ['访问范围', security.localOnly ? '仅本机' : security.binding],
+                        ['HTTP 方法', (security.allowedMethods || []).join(', ')],
+                        ['危险 XML 声明（DOCTYPE）', xml.doctypeAllowed ? '允许' : '已拒绝'],
+                        ['XML 读取外部文件', xml.externalEntitiesAllowed || xml.externalDtdAllowed ? '允许' : '已拒绝'],
+                        ['配置来源', xml.configSource === 'trusted-classpath' ? '只读项目内部配置' : xml.configSource]
+                      ];
+                      els.guardrailGrid.replaceChildren();
+                      items.forEach(([label, value]) => {
+                        const item = document.createElement('div');
+                        item.className = 'guardrail-item';
+                        const name = document.createElement('span');
+                        const detail = document.createElement('strong');
+                        name.textContent = label;
+                        detail.textContent = value;
+                        item.append(name, detail);
+                        els.guardrailGrid.append(item);
+                      });
+                    }
+
+                    function beanVisibleAt(beanName) {
+                      return { userDao: 3, userService: 4, userController: 6 }[beanName] ?? 0;
+                    }
+
+                    function beanState(beanName) {
+                      if (beanName === 'userService' && state.current < 5) return '对象已创建，等待注入 userDao';
+                      if (beanName === 'userController' && state.current < 7) return '对象已创建，等待注入 userService';
+                      if (state.current >= 8) return '依赖已连接，并已放入单例池';
+                      return '对象已创建，所需依赖已连接';
+                    }
+
+                    function renderBeans() {
+                      const visibleBeans = state.beans
+                        .filter(bean => state.current >= beanVisibleAt(bean.name))
+                        .sort((left, right) => beanVisibleAt(left.name) - beanVisibleAt(right.name));
+                      if (!visibleBeans.length) {
+                        els.beanList.innerHTML = '<div class="plain-result pending">目前只有配置蓝图，还没有创建 Java 对象。</div>';
+                        return;
+                      }
+                      els.beanList.innerHTML = visibleBeans.map(bean => `
                         <div class="bean-row">
-                          <strong>${escapeHtml(bean.name)}</strong>
-                          <span>${escapeHtml(bean.className)}</span>
+                          <div class="bean-head">
+                            <strong>对象名：${escapeHtml(bean.name)}</strong>
+                            ${bean.proxied ? '<span class="bean-badge">已由 AOP 增强</span>' : ''}
+                          </div>
+                          <span class="bean-class">Java 类：${escapeHtml(bean.displayClassName)}（实际业务代码）</span>
                           <span>${escapeHtml(bean.role)}</span>
+                          <span>${escapeHtml(beanState(bean.name))}</span>
+                          <details>
+                            <summary>技术详情</summary>
+                            <code>${escapeHtml(bean.className)}</code>
+                          </details>
                         </div>
                       `).join('');
+                    }
+
+                    function renderCurrentState() {
+                      const completedSteps = state.steps.slice(0, state.current + 1);
+                      const currentStep = state.steps[state.current];
+                      renderBeans();
+                      els.traceText.textContent = completedSteps
+                        .map((step, index) => `${index + 1}. ${step.title}\\n   ${step.description}`)
+                        .join('\\n');
+
+                      const xmlExplanations = {
+                        'load-xml': '容器已找到 spring.xml。这份文件告诉容器需要管理哪些对象。',
+                        'parse-definitions': '容器读懂三个 <bean> 标签，并为每个对象生成一份说明书；对象还没有创建。',
+                        'register-definitions': '容器已经记住 userDao、userService、userController 的三份对象说明书。',
+                        'create-dao': '容器开始照着说明书创建最底层的 userDao。',
+                        'create-service': '容器创建 userService，并看到它还需要 company 值和 userDao。',
+                        'inject-dao': 'ref="userDao" 表示需要另一个对象；容器自动把 userDao 交给 userService，这就是依赖注入。',
+                        'create-controller': '容器创建对外调用入口 userController。',
+                        'inject-service': '容器自动把 userService 交给 userController，三个对象现在已经连通。',
+                        'store-singletons': '容器保存好三个对象；以后按同一个名字获取时，会复用原来的对象。',
+                        'get-bean': '程序按名字取出 userController，并沿着入口、业务、数据三层完成查询。'
+                      };
+                      els.xmlExplanation.textContent = xmlExplanations[currentStep.id] || currentStep.description;
+
+                      if (state.current === state.steps.length - 1) {
+                        els.userResult.classList.remove('pending');
+                        els.userResult.innerHTML = `<strong>依赖链运行成功</strong>
+                          userController 调用 userService，userService 再调用 userDao。<br>
+                          最终返回：${escapeHtml(state.userResult)}`;
+                      } else {
+                        els.userResult.classList.add('pending');
+                        els.userResult.textContent = `当前完成 ${state.current + 1}/10 步。最终查询尚未执行；继续到第 10 步即可看到结果。`;
+                      }
                     }
 
                     function showStep(index) {
@@ -664,6 +908,7 @@ public class MiniSpringWebServer {
                       els.progressBar.style.width = `${((state.current + 1) / state.steps.length) * 100}%`;
                       els.prevBtn.disabled = state.current === 0;
                       els.nextBtn.disabled = state.current === state.steps.length - 1;
+                      renderCurrentState();
                     }
 
                     function nextStep() {
@@ -695,27 +940,23 @@ public class MiniSpringWebServer {
                       els.playBtn.textContent = '自动播放';
                     }
 
-                    async function runGetBean() {
-                      const data = await getJson('/api/user');
-                      els.userResult.textContent = data.result;
-                    }
-
                     async function init() {
                       try {
-                        const [flow, beans, xml, trace] = await Promise.all([
+                        const [flow, beans, xml, security, user] = await Promise.all([
                           getJson('/api/flow'),
                           getJson('/api/beans'),
                           getJson('/api/xml'),
-                          getJson('/api/trace')
+                          getJson('/api/security'),
+                          getJson('/api/user')
                         ]);
                         state.steps = flow.steps;
+                        state.beans = beans.beans;
+                        state.userResult = user.result;
                         renderStepList();
-                        renderBeans(beans.beans);
                         els.xmlSource.textContent = xml.xml;
-                        els.traceText.textContent = trace.steps.join('\\n');
+                        renderGuardrails(security);
                         els.status.textContent = '流程已加载，可以逐步查看 IoC 容器创建 Bean 的过程。';
                         showStep(0);
-                        await runGetBean();
                       } catch (error) {
                         els.status.textContent = `加载失败：${error.message}`;
                       }

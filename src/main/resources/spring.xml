@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans>
+    <!-- userDao：创建负责提供用户数据的对象。id 是容器里的名字，class 是要创建的 Java 类。 -->
     <bean id="userDao" class="com.test.minispring.bean.TestUserDao"/>
 
+    <!-- userService：创建业务对象；value 直接填入文字，ref 表示引用另一个 Bean。 -->
     <bean id="userService" class="com.test.minispring.bean.TestUserService">
         <property name="company" value="Legend Co., Ltd."/>
         <property name="userDao" ref="userDao"/>
     </bean>
 
+    <!-- userController：创建调用入口，并把已经创建好的 userService 连接进来。 -->
     <bean id="userController" class="com.test.minispring.bean.TestUserController">
         <property name="userService" ref="userService"/>
     </bean>

@@ -41,7 +41,7 @@ public class AppTest {
         assertEquals(10, service.visualFlow().size());
         assertEquals("load-xml", service.visualFlow().get(0).id());
         assertTrue(service.visualFlow().stream()
-                .anyMatch(step -> step.title().contains("注入 userDao")
+                .anyMatch(step -> step.title().contains("把 userDao 交给 userService")
                         && step.activeEdges().contains("dao-service")));
         assertTrue(service.visualFlow().get(9).activeNodes().contains("client"));
     }

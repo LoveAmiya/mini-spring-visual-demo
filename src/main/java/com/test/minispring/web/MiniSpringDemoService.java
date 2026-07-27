@@ -39,7 +39,15 @@ public class MiniSpringDemoService {
         List<BeanView> beans = new ArrayList<>();
         for (String beanName : beanNames) {
             Object bean = context.getBean(beanName);
-            beans.add(new BeanView(beanName, bean.getClass().getName(), describeRole(beanName)));
+            String runtimeClassName = bean.getClass().getName();
+            String sourceClassName = runtimeClassName.split("\\$\\$", 2)[0];
+            String displayClassName = sourceClassName.substring(sourceClassName.lastIndexOf('.') + 1);
+            beans.add(new BeanView(
+                    beanName,
+                    runtimeClassName,
+                    displayClassName,
+                    describeRole(beanName),
+                    !runtimeClassName.equals(sourceClassName)));
         }
         return beans;
     }
@@ -76,80 +84,80 @@ public class MiniSpringDemoService {
         return List.of(
                 new FlowStep(
                         "load-xml",
-                        "加载 XML 配置",
-                        "ClassPathXmlApplicationContext 从 classpath:spring.xml 读取 Bean 配置文件，拿到容器启动的原始输入。",
+                        "找到配置文件",
+                        "程序启动容器后，先找到 spring.xml；这份文件写着需要创建哪些对象，以及对象之间如何连接。",
                         "src/main/resources/spring.xml",
                         List.of("xml"),
                         List.of()
                 ),
                 new FlowStep(
                         "parse-definitions",
-                        "解析 BeanDefinition",
-                        "XmlBeanDefinitionReader 把 XML 中的 bean 标签解析成 BeanDefinition。此时只是得到对象蓝图，还没有真正创建 Java 对象。",
+                        "读懂三条对象配置",
+                        "容器逐条读取三个 bean 标签，把每一条翻译成一份对象说明书；此时还没有创建真正的 Java 对象。",
                         "mini-spring-core/.../XmlBeanDefinitionReader.java",
                         List.of("xml", "reader", "definition"),
                         List.of("xml-reader", "reader-definition")
                 ),
                 new FlowStep(
                         "register-definitions",
-                        "注册 BeanDefinition",
-                        "DefaultListableBeanFactory 将 userDao、userService、userController 的 BeanDefinition 注册到容器内部的定义表中。",
+                        "记住三份对象说明书",
+                        "容器把 userDao、userService、userController 的创建说明保存起来，后面可以随时按名字找到。",
                         "mini-spring-core/.../DefaultListableBeanFactory.java",
                         List.of("definition", "registry"),
                         List.of("definition-registry")
                 ),
                 new FlowStep(
                         "create-dao",
-                        "创建 userDao",
-                        "容器先创建最底层依赖 userDao。这个 Bean 没有 ref 依赖，可以直接实例化并进入后续初始化流程。",
+                        "按说明书创建 userDao",
+                        "容器先创建负责提供用户数据的 userDao。它不依赖其他对象，所以可以直接创建。",
                         "src/main/java/com/test/minispring/bean/TestUserDao.java",
                         List.of("registry", "factory", "dao"),
                         List.of("registry-factory", "factory-dao")
                 ),
                 new FlowStep(
                         "create-service",
-                        "创建 userService",
-                        "容器创建 userService，并准备处理它的属性：company 是普通 value，userDao 是 ref 依赖。",
+                        "按说明书创建 userService",
+                        "容器接着创建负责业务处理的 userService；配置说明它还需要公司名称和 userDao。",
                         "src/main/java/com/test/minispring/bean/TestUserService.java",
                         List.of("factory", "service"),
                         List.of("registry-factory", "factory-service")
                 ),
                 new FlowStep(
                         "inject-dao",
-                        "注入 userDao",
-                        "容器发现 userService 依赖 userDao，于是从容器中取出 userDao 实例，注入到 userService.userDao 字段。",
+                        "把 userDao 交给 userService",
+                        "容器把已经创建好的 userDao 自动连接到 userService。这个自动连接过程叫依赖注入。",
                         "src/main/resources/spring.xml",
                         List.of("dao", "service"),
                         List.of("dao-service")
                 ),
                 new FlowStep(
                         "create-controller",
-                        "创建 userController",
-                        "容器创建 Controller 层 Bean。它代表外部调用入口，但此时还需要注入 userService 才能完整工作。",
+                        "按说明书创建 userController",
+                        "容器创建对外接收查询的 userController；它还需要 userService 才能完成工作。",
                         "src/main/java/com/test/minispring/bean/TestUserController.java",
                         List.of("factory", "controller"),
                         List.of("factory-controller")
                 ),
                 new FlowStep(
                         "inject-service",
-                        "注入 userService",
-                        "容器把已经完成依赖注入的 userService 注入到 userController，形成 Controller -> Service -> Dao 调用链。",
+                        "把 userService 交给 userController",
+                        "容器把 userService 自动连接到 userController，三者组成“接收查询 → 处理业务 → 提供数据”的调用链。",
                         "src/main/resources/spring.xml",
                         List.of("service", "controller"),
                         List.of("service-controller")
                 ),
                 new FlowStep(
                         "store-singletons",
-                        "放入单例池",
-                        "创建完成的单例 Bean 会进入 singletonObjects 缓存。后续 getBean 可以直接返回同一个已装配对象。",
+                        "保存三个可复用对象",
+                        "容器保存这三个已经连接好的对象。以后再次按名字获取时，会复用同一批对象，不必重新创建。",
                         "mini-spring-core/.../DefaultSingletonBeanRegistry.java",
                         List.of("dao", "service", "controller", "singletons"),
                         List.of("dao-singletons", "service-singletons", "controller-singletons")
                 ),
                 new FlowStep(
                         "get-bean",
-                        "getBean 返回对象",
-                        "应用调用 getBean(\"userController\")，容器返回已经完成创建和依赖注入的 Controller，queryUserInfo() 证明链路可用。",
+                        "取出入口并完成查询",
+                        "程序向容器索要 userController，然后沿着三层对象完成查询；最终结果证明自动创建和连接都成功。",
                         "src/main/java/com/test/minispring/App.java",
                         List.of("singletons", "client", "controller"),
                         List.of("singletons-client", "client-controller")
@@ -159,18 +167,23 @@ public class MiniSpringDemoService {
 
     private String describeRole(String beanName) {
         if ("userDao".equals(beanName)) {
-            return "Data access bean";
+            return "数据访问对象：负责提供用户数据";
         }
         if ("userService".equals(beanName)) {
-            return "Business service bean with value and ref injection";
+            return "业务服务：接收 company 配置，并使用 userDao 查询数据";
         }
         if ("userController".equals(beanName)) {
-            return "Controller-style bean used by the demo";
+            return "调用入口：使用 userService 对外提供查询结果";
         }
-        return "Mini-Spring bean";
+        return "由 Mini-Spring 容器管理的对象";
     }
 
-    public record BeanView(String name, String className, String role) {
+    public record BeanView(
+            String name,
+            String className,
+            String displayClassName,
+            String role,
+            boolean proxied) {
     }
 
     public record FlowStep(

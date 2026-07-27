@@ -20,6 +20,9 @@ The project includes a simplified framework core, an XML-configured sample appli
 - Bean lifecycle and dependency-injection tests
 - Local browser console for runtime inspection
 - Self-contained Maven setup with PowerShell helpers
+- Beginner-facing glossary for Bean, IoC, dependency injection, AOP proxy, BeanDefinition, and singleton scope
+- Annotated `spring.xml`, plain-language flow steps, and per-bean role/status explanations
+- Responsive flow layout that switches to a vertical sequence on narrow screens
 
 ### Repository Layout
 
@@ -38,15 +41,17 @@ run_visual_console.ps1   Installs the core module and starts the console
 ```powershell
 git clone https://github.com/LoveAmiya/mini-spring-visual-demo.git
 cd mini-spring-visual-demo
-.\run_tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run_tests.ps1
 ```
 
 The test script first installs `mini-spring-core` into the local Maven repository, then runs the visual demo test suite.
 
+XML bean definitions are treated as trusted, classpath-owned application configuration. The parser rejects `DOCTYPE` declarations and external entities, and the demo does not accept XML from HTTP requests or uploads.
+
 ### Start the Visual Console
 
 ```powershell
-.\run_visual_console.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run_visual_console.ps1
 ```
 
 Open the console at:
@@ -54,6 +59,10 @@ Open the console at:
 ```text
 http://127.0.0.1:18080
 ```
+
+The console always binds to the loopback interface. Ports supplied through the command line or `MINI_SPRING_WEB_PORT` must be between 1 and 65535.
+
+As of 2026-07-28, the complete core and demo regression suites pass `82/82` tests, including malicious `DOCTYPE`/external-entity rejection and browser HTML/API contracts.
 
 Available API endpoints:
 
@@ -82,7 +91,7 @@ mvn exec:java '-Dexec.mainClass=com.test.minispring.App'
 
 ### Requirements
 
-- JDK
+- JDK 17 or newer
 - Maven
 - PowerShell on Windows for the helper scripts
 
@@ -104,6 +113,9 @@ Mini-Spring Visual Demo 是一个自包含的 Java 项目，实现了一个精�
 - Bean 生命周期和依赖注入测试
 - 本地浏览器控制台，可观察运行结果
 - 自包含 Maven 项目，并提供 PowerShell 辅助脚本
+- 面向初学者解释 Bean、IoC、依赖注入、AOP 代理、BeanDefinition 和单例
+- 带中文注释的 `spring.xml`、通俗化十步流程和每个 Bean 的用途/状态说明
+- 窄屏自动切换为纵向流程，避免节点和文字重叠
 
 ### 项目结构
 
@@ -122,15 +134,17 @@ run_visual_console.ps1   安装核心模块并启动可视化控制台
 ```powershell
 git clone https://github.com/LoveAmiya/mini-spring-visual-demo.git
 cd mini-spring-visual-demo
-.\run_tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run_tests.ps1
 ```
 
 测试脚本会先把 `mini-spring-core` 安装到本地 Maven 仓库，再运行外层可视化示例的测试。
 
+XML Bean 定义被视为由应用维护的、可信的类路径配置。解析器会拒绝 `DOCTYPE` 和外部实体，演示服务也不会从 HTTP 请求或上传文件中读取 Bean XML。
+
 ### 启动可视化控制台
 
 ```powershell
-.\run_visual_console.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run_visual_console.ps1
 ```
 
 浏览器打开：
@@ -138,6 +152,10 @@ cd mini-spring-visual-demo
 ```text
 http://127.0.0.1:18080
 ```
+
+控制台始终绑定回环地址。命令行或 `MINI_SPRING_WEB_PORT` 提供的端口必须在 1 到 65535 之间。
+
+截至 2026-07-28，核心模块与演示模块完整回归为 `82/82` 通过，覆盖恶意 `DOCTYPE`/外部实体拒绝以及浏览器 HTML/API 契约。
 
 可用接口：
 
@@ -166,6 +184,6 @@ mvn exec:java '-Dexec.mainClass=com.test.minispring.App'
 
 ### 环境要求
 
-- JDK
+- JDK 17 或更高版本
 - Maven
 - Windows PowerShell，用于运行辅助脚本
